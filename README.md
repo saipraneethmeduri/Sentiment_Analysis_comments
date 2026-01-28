@@ -461,7 +461,7 @@ Models are downloaded once to `models/` directory (~5-10 GB total). Subsequent r
 ### Memory Usage
 Each model requires ~2-4 GB RAM/VRAM when loaded. With 4 models:
 - CPU: ~12-16 GB RAM recommended
-- GPU: ~ GB VRAM recommended
+- GPU: ~4 GB VRAM recommended
 
 ### Troubleshooting
 
