@@ -425,7 +425,7 @@ Results will be saved to `sentiment_analysis/outputs/`:
 - Comparison file: `sentiment_comparison.csv`
 
 ```
-
+```
 ---
 
 ## 🔧 System Requirements
