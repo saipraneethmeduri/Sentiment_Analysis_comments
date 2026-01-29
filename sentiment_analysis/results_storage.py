@@ -1,12 +1,13 @@
 """
 Results Storage Module
-Stores sentiment analysis results to CSV with all metrics
+Stores sentiment analysis results to CSV with all metrics and per-model folders
 """
 
 import pandas as pd
 from typing import Dict, List
 import logging
 from datetime import datetime
+import os
 
 logger = logging.getLogger(__name__)
 
@@ -105,40 +106,89 @@ def save_results_csv(
 
 def save_results_per_model(
     results_df: pd.DataFrame,
+    comments_df: pd.DataFrame,
     output_dir: str
 ) -> Dict[str, str]:
     """
-    Save results to separate CSV file for each model.
+    Save per-model predictions with ground truth to separate folders and CSV files.
+    Creates outputs/{model_name}/ folder for each model with predictions.csv
     
     Args:
         results_df: Combined results dataframe with all models
-        output_dir: Output directory for model-specific CSV files
+        comments_df: Original comments dataframe with ground truth labels
+        output_dir: Base output directory for model-specific folders
         
     Returns:
-        Dictionary mapping model_name -> output_file_path
+        Dictionary mapping model_name -> folder_path
     """
-    import os
     os.makedirs(output_dir, exist_ok=True)
     
-    saved_files = {}
+    saved_folders = {}
+    
+    # Create a lookup for ground truth labels
+    gt_lookup = {}
+    for _, row in comments_df.iterrows():
+        key = (str(row['entity_id']), str(row['comment']))
+        gt_lookup[key] = {
+            'ground_truth_sentiment': row['sentiment_class'],
+            'ground_truth_name': row['sentiment_name']
+        }
     
     for model_name in results_df['model_name'].unique():
         # Filter results for this model
         model_df = results_df[results_df['model_name'] == model_name].copy()
         
-        # Create sanitized filename from model name
+        # Create sanitized folder name from model name
         safe_model_name = model_name.replace('/', '_').replace('-', '_')
-        output_file = os.path.join(output_dir, f"sentiment_results_{safe_model_name}.csv")
+        model_folder = os.path.join(output_dir, safe_model_name)
+        os.makedirs(model_folder, exist_ok=True)
+        
+        # Add ground truth labels to predictions
+        model_df['ground_truth_sentiment'] = model_df.apply(
+            lambda row: gt_lookup.get(
+                (str(row['entity_id']), str(row['comment'])),
+                {'ground_truth_sentiment': -1}
+            )['ground_truth_sentiment'],
+            axis=1
+        )
+        
+        model_df['ground_truth_name'] = model_df.apply(
+            lambda row: gt_lookup.get(
+                (str(row['entity_id']), str(row['comment'])),
+                {'ground_truth_name': 'unknown'}
+            )['ground_truth_name'],
+            axis=1
+        )
+        
+        # Rename columns for clarity
+        model_df = model_df.rename(columns={
+            'sentiment_class': 'predicted_sentiment',
+            'sentiment_name': 'predicted_name'
+        })
+        
+        # Add correctness flag
+        model_df['correct'] = model_df['ground_truth_sentiment'] == model_df['predicted_sentiment']
+        
+        # Select relevant columns
+        output_df = model_df[
+            ['entity_id', 'comment', 'ground_truth_sentiment', 'ground_truth_name',
+             'predicted_sentiment', 'predicted_name', 'confidence_score', 
+             'inference_time_ms', 'correct']
+        ].copy()
+        
+        # Save to CSV
+        predictions_csv = os.path.join(model_folder, f"{safe_model_name}_predictions.csv")
         
         try:
-            model_df.to_csv(output_file, index=False)
-            saved_files[model_name] = output_file
-            logger.info(f"Results for {model_name} saved to {output_file}")
-            logger.info(f"  - Rows: {len(model_df)}, Columns: {len(model_df.columns)}")
+            output_df.to_csv(predictions_csv, index=False)
+            saved_folders[model_name] = model_folder
+            logger.info(f"Predictions for {model_name} saved to {predictions_csv}")
+            logger.info(f"  - Rows: {len(output_df)}, Columns: {len(output_df.columns)}")
+            logger.info(f"  - Correct predictions: {output_df['correct'].sum()} / {len(output_df)}")
         except Exception as e:
-            logger.error(f"Error saving results for {model_name}: {e}")
+            logger.error(f"Error saving predictions for {model_name}: {e}")
     
-    return saved_files
+    return saved_folders
 
 
 def get_results_summary(results_df: pd.DataFrame, model_metadata: Dict) -> Dict:

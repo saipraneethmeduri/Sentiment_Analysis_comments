@@ -1,0 +1,158 @@
+================================================================================
+CLASSIFICATION METRICS - ai4bharat/indic-bert
+================================================================================
+
+Accuracy: 0.8225
+Macro F1-score: 0.3401
+Macro Recall: 0.3531
+Macro Precision: 0.4322
+
+Per-Class Metrics:
+Class        Precision    Recall       F1-score     Support   
+----------------------------------------------------------
+positive     0.8280       0.9919       0.9026       1737      
+neutral      0.0000       0.0000       0.0000       153       
+negative     0.4688       0.0673       0.1176       223       
+
+Confusion Matrix:
+                Predicted
+                Positive  Neutral   Negative
+Actual Positive 1723       0          14        
+Actual Neutral 150        0          3         
+Actual Negative 208        0          15        
+================================================================================
+2026-01-28 17:06:12,201 - __main__ - INFO - Processing metrics for cardiffnlp/twitter-xlm-roberta-base-sentiment...
+2026-01-28 17:06:12,280 - sentiment_analysis.metrics - INFO - Identified 326 misclassified samples out of 2113
+
+================================================================================
+CLASSIFICATION METRICS - cardiffnlp/twitter-xlm-roberta-base-sentiment
+================================================================================
+
+Accuracy: 0.8457
+Macro F1-score: 0.7079
+Macro Recall: 0.8006
+Macro Precision: 0.6753
+
+Per-Class Metrics:
+Class        Precision    Recall       F1-score     Support   
+----------------------------------------------------------
+positive     0.9907       0.8607       0.9211       1737      
+neutral      0.3192       0.7386       0.4458       153       
+negative     0.7160       0.8027       0.7569       223       
+
+Confusion Matrix:
+                Predicted
+                Positive  Neutral   Negative
+Actual Positive 1495       198        44        
+Actual Neutral 13         113        27        
+Actual Negative 1          43         179       
+================================================================================
+2026-01-28 17:06:12,281 - __main__ - INFO - Processing metrics for FacebookAI/xlm-roberta-base...
+2026-01-28 17:06:12,356 - sentiment_analysis.metrics - INFO - Identified 1948 misclassified samples out of 2113
+
+================================================================================
+CLASSIFICATION METRICS - FacebookAI/xlm-roberta-base
+================================================================================
+
+Accuracy: 0.0781
+Macro F1-score: 0.0840
+Macro Recall: 0.3492
+Macro Precision: 0.1803
+
+Per-Class Metrics:
+Class        Precision    Recall       F1-score     Support   
+----------------------------------------------------------
+positive     0.0000       0.0000       0.0000       1737      
+neutral      0.0721       0.9804       0.1343       153       
+negative     0.4688       0.0673       0.1176       223       
+
+Confusion Matrix:
+                Predicted
+                Positive  Neutral   Negative
+Actual Positive 0          1723       14        
+Actual Neutral 0          150        3         
+Actual Negative 0          208        15        
+================================================================================
+2026-01-28 17:06:12,356 - __main__ - INFO - Processing metrics for google/muril-base-cased...
+2026-01-28 17:06:12,430 - sentiment_analysis.metrics - INFO - Identified 375 misclassified samples out of 2113
+
+================================================================================
+CLASSIFICATION METRICS - google/muril-base-cased
+================================================================================
+
+Accuracy: 0.8225
+Macro F1-score: 0.3401
+Macro Recall: 0.3531
+Macro Precision: 0.4322
+
+Per-Class Metrics:
+Class        Precision    Recall       F1-score     Support   
+----------------------------------------------------------
+positive     0.8280       0.9919       0.9026       1737      
+neutral      0.0000       0.0000       0.0000       153       
+negative     0.4688       0.0673       0.1176       223       
+
+Confusion Matrix:
+                Predicted
+                Positive  Neutral   Negative
+Actual Positive 1723       0          14        
+Actual Neutral 150        0          3         
+Actual Negative 208        0          15        
+
+================================================================================
+SENTIMENT ANALYSIS RESULTS SUMMARY
+================================================================================
+Total Comments Analyzed: 20
+Total Models Used: 4
+Average Confidence Score: 0.5244
+Total Processing Time: 66.75s
+
+Sentiment Distribution (across all models):
+  positive: 5671 (67.1%)
+  neutral: 2435 (28.8%)
+  negative: 346 (4.1%)
+
+Per-Model Metrics:
+
+  ai4bharat/indic-bert
+    Device: cpu
+    Load Time: 2292.26ms
+    Avg Latency: 26.17ms/comment
+    Throughput: 38.0 comments/sec
+    Avg Confidence: 0.5026
+
+  cardiffnlp/twitter-xlm-roberta-base-sentiment
+    Device: cpu
+    Load Time: 2453.23ms
+    Avg Latency: 27.25ms/comment
+    Throughput: 36.5 comments/sec
+    Avg Confidence: 0.5873
+
+  FacebookAI/xlm-roberta-base
+    Device: cpu
+    Load Time: 2671.58ms
+    Avg Latency: 31.47ms/comment
+    Throughput: 31.7 comments/sec
+    Avg Confidence: 0.5151
+
+  google/muril-base-cased
+    Device: cpu
+    Load Time: 2141.47ms
+    Avg Latency: 31.16ms/comment
+    Throughput: 31.9 comments/sec
+    Avg Confidence: 0.4927
+
+================================================================================
+
+================================================================================
+MODEL CLASSIFICATION METRICS SUMMARY
+================================================================================
+
+Per-Model Performance:
+---------------------------------------------------------------------------------------------------------------------------------------------------------
+Model                                                  Accuracy     Precision    Recall       F1 Score     Correct         Device       Throughput  
+---------------------------------------------------------------------------------------------------------------------------------------------------------
+cardiffnlp_twitter-xlm-roberta-base-sentiment           0.8457       0.6753       0.8006       0.7079       1787/2113       cpu          36.5 c/s    
+ai4bharat_indic-bert                                    0.8225       0.4322       0.3531       0.3401       1738/2113       cpu          38.0 c/s    
+google_muril-base-cased                                 0.8225       0.4322       0.3531       0.3401       1738/2113       cpu          31.9 c/s    
+FacebookAI_xlm-roberta-base                             0.0781       0.1803       0.3492       0.0840       165/2113        cpu          31.7 c/s    

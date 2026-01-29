@@ -24,11 +24,11 @@ from sentiment_analysis.results_storage import (
     print_results_summary
 )
 from sentiment_analysis.aggregator import (
-    calculate_model_agreement,
     generate_comparison_csv,
-    get_model_consensus,
     print_aggregation_summary
 )
+from sentiment_analysis.metrics import calculate_model_metrics, print_metrics_summary
+from sentiment_analysis.visualization_utils import generate_all_visualizations
 
 
 # Configure logging
@@ -61,7 +61,7 @@ def setup_paths(
     workspace_root = Path(__file__).parent.parent
     
     if comments_csv is None:
-        comments_csv = workspace_root / "comments_data" / "entity_comments_details_20.csv"
+        comments_csv = workspace_root / "label_data" / "entity_comments_details_20_labeled.csv"
     
     if models_csv is None:
         models_csv = workspace_root / "sentiment_analysis_model_list.csv"
@@ -165,36 +165,71 @@ def run_sentiment_analysis(
             }
         
         # Step 5: Prepare and save results
-        logger.info("\n[Step 5/5] Preparing and saving results...")
+        logger.info("\n[Step 5/7] Preparing and saving results...")
         results_df, model_metadata = prepare_results_dataframe(
             comments_df,
             model_results,
             normalized_sentiments
         )
         
-        # Save results to separate CSV file for each model
-        logger.info("\nSaving individual model results...")
-        saved_files = save_results_per_model(results_df, output_dir)
-        logger.info(f"Successfully saved {len(saved_files)} model result files")
+        # Step 6: Calculate classification metrics and generate visualizations
+        logger.info("\n[Step 6/7] Calculating classification metrics and generating visualizations...")
+        model_metrics_dict = {}
         
-        # Generate and save comparison CSV
-        comparison_path = Path(output_dir) / "sentiment_comparison.csv"
-        generate_comparison_csv(results_df, model_metadata, str(comparison_path))
+        for model_name in results_df['model_name'].unique():
+            logger.info(f"Processing metrics for {model_name}...")
+            
+            # Get predictions for this model
+            model_df = results_df[results_df['model_name'] == model_name].copy()
+            
+            # Add ground truth labels
+            gt_lookup = {}
+            for _, row in comments_df.iterrows():
+                key = (str(row['entity_id']), str(row['comment']))
+                gt_lookup[key] = row['sentiment_class']
+            
+            model_df['ground_truth_sentiment'] = model_df.apply(
+                lambda row: gt_lookup.get((str(row['entity_id']), str(row['comment'])), -1),
+                axis=1
+            )
+            model_df['predicted_sentiment'] = model_df['sentiment_class']
+            
+            # Calculate metrics
+            metrics = calculate_model_metrics(model_df, model_name)
+            model_metrics_dict[model_name] = metrics
+            
+            # Print metrics for this model
+            print_metrics_summary(metrics)
         
-        # Calculate and display summaries
+        # Step 7: Save per-model folders with predictions and visualizations
+        logger.info("\n[Step 7/7] Saving per-model folders with predictions and visualizations...")
+        saved_folders = save_results_per_model(results_df, comments_df, output_dir)
+        logger.info(f"Successfully created {len(saved_folders)} model folders")
+        
+        # Generate visualizations for each model
+        for model_name, model_folder in saved_folders.items():
+            logger.info(f"Generating visualizations for {model_name}...")
+            metrics = model_metrics_dict.get(model_name, {})
+            generate_all_visualizations(metrics, model_folder, model_name)
+        
+        # Generate and save summary comparison CSV
+        comparison_path = Path(output_dir) / "summary_comparison.csv"
+        generate_comparison_csv(results_df, comments_df, model_metadata, str(comparison_path), model_metrics_dict)
+        
+        # Display overall summary
         results_summary = get_results_summary(results_df, model_metadata)
         print_results_summary(results_summary)
         
-        agreement_metrics = calculate_model_agreement(results_df)
-        consensus_metrics = get_model_consensus(results_df)
-        print_aggregation_summary(agreement_metrics, consensus_metrics)
+        # Display classification metrics summary
+        print_aggregation_summary(model_metrics_dict, model_metadata)
         
         logger.info("\n" + "="*80)
         logger.info("SENTIMENT ANALYSIS PIPELINE COMPLETED SUCCESSFULLY")
         logger.info(f"Results saved to: {output_dir}")
-        logger.info("Per-model result files generated:")
-        for model_name, file_path in saved_files.items():
-            logger.info(f"  - {model_name}: {file_path}")
+        logger.info("\\nPer-model folders created:")
+        for model_name, folder_path in saved_folders.items():
+            logger.info(f"  - {model_name}: {folder_path}")
+        logger.info(f"\\nSummary comparison saved to: {comparison_path}")
         logger.info("="*80)
         
         return True
@@ -223,7 +258,7 @@ Examples:
         "--comments",
         type=str,
         default=None,
-        help="Path to comments CSV file (default: comments_data/entity_comments_details_20.csv)"
+        help="Path to comments CSV file (default: label_data/entity_comments_details_20_labeled.csv)"
     )
     
     parser.add_argument(

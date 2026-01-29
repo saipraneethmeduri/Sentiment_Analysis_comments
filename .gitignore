@@ -12,3 +12,4 @@ wheels/
 .env
 models/
 input_data/
+label_data/

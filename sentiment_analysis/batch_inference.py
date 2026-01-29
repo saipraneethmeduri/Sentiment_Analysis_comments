@@ -14,17 +14,23 @@ logger = logging.getLogger(__name__)
 
 def read_comments_data(csv_path: str) -> pd.DataFrame:
     """
-    Read comments data from CSV.
+    Read comments data from CSV with ground truth labels.
     
     Args:
-        csv_path: Path to entity_comments_details_20.csv
+        csv_path: Path to entity_comments_details_20_labeled.csv
         
     Returns:
-        DataFrame with entity_id and comment columns
+        DataFrame with entity_id, comment, sentiment_class, and sentiment_name columns
     """
     try:
         df = pd.read_csv(csv_path)
         logger.info(f"Loaded {len(df)} comments from {csv_path}")
+        logger.info(f"Columns: {list(df.columns)}")
+        # Ensure required columns exist
+        required_cols = ['entity_id', 'comment', 'sentiment_class', 'sentiment_name']
+        if not all(col in df.columns for col in required_cols):
+            logger.error(f"Missing required columns. Expected: {required_cols}, Got: {list(df.columns)}")
+            return pd.DataFrame()
         return df
     except Exception as e:
         logger.error(f"Error reading comments from {csv_path}: {e}")
