@@ -40,7 +40,7 @@ def prepare_results_dataframe(
     for model_name, model_info in model_results.items():
         inference_results = model_info["inference_results"]
         labels = inference_results["labels"]
-        scores = inference_results["scores"]
+        scores = inference_results["scores"]  # Now a list of dictionaries
         latencies = inference_results["latencies"]
         
         # Get normalized sentiments for this model
@@ -53,13 +53,23 @@ def prepare_results_dataframe(
         
         # Build rows for this model
         for i in range(len(comments)):
+            # Extract max score from scores_dict for confidence_score
+            scores_dict = scores[i] if i < len(scores) else {}
+            max_confidence = max(scores_dict.values()) if scores_dict else 0.0
+            
+            # Format all class scores as a readable string
+            # Sort by score descending to show confidence ranking
+            sorted_scores = sorted(scores_dict.items(), key=lambda x: x[1], reverse=True) if scores_dict else []
+            all_scores_str = "; ".join([f"{label}: {score:.4f}" for label, score in sorted_scores])
+            
             row = {
                 "entity_id": entity_ids[i],
                 "comment": comments[i],
                 "model_name": model_name,
                 "sentiment_class": sentiment_classes[i] if i < len(sentiment_classes) else 1,
                 "sentiment_name": sentiment_names[i] if i < len(sentiment_names) else "neutral",
-                "confidence_score": scores[i] if i < len(scores) else 0.0,
+                "confidence_score": max_confidence,
+                "all_class_scores": all_scores_str,
                 "inference_time_ms": latencies[i] if i < len(latencies) else 0.0
             }
             results_rows.append(row)
@@ -169,10 +179,10 @@ def save_results_per_model(
         # Add correctness flag
         model_df['correct'] = model_df['ground_truth_sentiment'] == model_df['predicted_sentiment']
         
-        # Select relevant columns
+        # Select relevant columns - include all_class_scores for transparency
         output_df = model_df[
             ['entity_id', 'comment', 'ground_truth_sentiment', 'ground_truth_name',
-             'predicted_sentiment', 'predicted_name', 'confidence_score', 
+             'predicted_sentiment', 'predicted_name', 'confidence_score', 'all_class_scores',
              'inference_time_ms', 'correct']
         ].copy()
         

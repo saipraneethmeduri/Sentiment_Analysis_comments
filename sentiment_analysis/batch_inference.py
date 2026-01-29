@@ -78,21 +78,29 @@ def batch_inference(
             outputs = pipeline(batch)
             batch_time_ms = (time.time() - batch_start) * 1000
             
-            # Extract results
+            # Extract results - get all class scores for argmax
             for output, text in zip(outputs, batch):
                 # Handle different output formats
                 if isinstance(output, list):
-                    # Multiple results per input
+                    # Multiple results per input - extract all scores
+                    scores_dict = {}
+                    for result in output:
+                        label = result.get('label', 'UNKNOWN')
+                        score = result.get('score', 0.0)
+                        scores_dict[label] = score
+                    
+                    # For backward compatibility, store top result
                     top_result = output[0]
-                    label = top_result.get('label', 'NEUTRAL')
-                    score = top_result.get('score', 0.0)
+                    top_label = top_result.get('label', 'NEUTRAL')
+                    all_labels.append(top_label)
                 else:
-                    # Single result per input
+                    # Single result per input - only one score available
                     label = output.get('label', 'NEUTRAL')
                     score = output.get('score', 0.0)
+                    scores_dict = {label: score}
+                    all_labels.append(label)
                 
-                all_labels.append(label)
-                all_scores.append(score)
+                all_scores.append(scores_dict)
                 all_latencies.append(batch_time_ms / len(batch))
             
             logger.debug(f"Processed batch {i // batch_size + 1}/{(len(texts) + batch_size - 1) // batch_size}")
@@ -102,7 +110,7 @@ def batch_inference(
             # Add placeholder results for failed batch
             for _ in batch:
                 all_labels.append("UNKNOWN")
-                all_scores.append(0.0)
+                all_scores.append({})
                 all_latencies.append(0.0)
     
     total_time_ms = (time.time() - total_start) * 1000

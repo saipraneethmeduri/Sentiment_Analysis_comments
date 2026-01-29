@@ -10,17 +10,15 @@ logger = logging.getLogger(__name__)
 
 
 def normalize_sentiment(
-    label: str,
-    model_name: str,
-    confidence: float = None
+    scores_dict: Dict[str, float],
+    model_name: str
 ) -> Tuple[int, str]:
     """
-    Normalize sentiment label to 3-class format.
+    Normalize sentiment using argmax on score dictionary.
     
     Args:
-        label: Original label from model
-        model_name: Name of the model (for context-specific handling)
-        confidence: Confidence score (optional, for threshold-based mapping)
+        scores_dict: Dictionary mapping label names to scores (e.g., {'LABEL_0': 0.1, 'LABEL_1': 0.3, 'LABEL_2': 0.6})
+        model_name: Name of the model (for context-specific label mapping)
         
     Returns:
         Tuple of (sentiment_class: int, sentiment_name: str)
@@ -28,54 +26,65 @@ def normalize_sentiment(
         - 1: neutral
         - 2: negative
     """
-    label = str(label).lower().strip()
-    
-    # Handle twitter sentiment model outputs (LABEL_0, LABEL_1, LABEL_2)
-    if label.startswith("label_"):
-        label_num = int(label.split("_")[1])
-        if model_name == "cardiffnlp/twitter-xlm-roberta-base-sentiment":
-            # This model outputs: LABEL_0=negative, LABEL_1=neutral, LABEL_2=positive
-            mapping = {0: 2, 1: 1, 2: 0}  # Map to our format: 0=positive, 1=neutral, 2=negative
-            return mapping[label_num], get_sentiment_name(mapping[label_num])
-        return label_num, get_sentiment_name(label_num)
-    
-    # Positive sentiment variations
-    positive_keywords = [
-        "positive", "good", "great", "excellent", "amazing", "awesome",
-        "love", "wonderful", "fantastic", "perfect", "nice", "best"
-    ]
-    
-    # Negative sentiment variations
-    negative_keywords = [
-        "negative", "bad", "terrible", "awful", "hate", "horrible",
-        "poor", "worst", "disappointing", "useless", "waste", "wrong"
-    ]
-    
-    # Neutral sentiment variations
-    neutral_keywords = [
-        "neutral", "okay", "ok", "fine", "average", "normal", "none"
-    ]
-    
-    # Check for exact matches or substring matches
-    if any(keyword in label for keyword in positive_keywords):
-        return 0, "positive"
-    elif any(keyword in label for keyword in negative_keywords):
-        return 2, "negative"
-    elif any(keyword in label for keyword in neutral_keywords):
+    if not scores_dict:
+        logger.warning(f"Empty scores_dict received for model {model_name}")
         return 1, "neutral"
     
-    # Default: try to infer from confidence if available
-    if confidence is not None:
-        if confidence > 0.7:
-            return 0, "positive"
-        elif confidence < 0.3:
-            return 2, "negative"
-        else:
-            return 1, "neutral"
+    # First, normalize all labels to standard format (positive/neutral/negative)
+    normalized_scores = {}
     
-    # Fallback
-    logger.warning(f"Could not normalize label: {label} from model {model_name}")
-    return 1, "neutral"
+    for label, score in scores_dict.items():
+        label_lower = str(label).lower().strip()
+        
+        # Handle LABEL_N format (common in HuggingFace models)
+        if label_lower.startswith("label_"):
+            label_num = int(label_lower.split("_")[1])
+            if model_name == "cardiffnlp/twitter-xlm-roberta-base-sentiment":
+                # This model: LABEL_0=negative, LABEL_1=neutral, LABEL_2=positive
+                label_map = {0: "negative", 1: "neutral", 2: "positive"}
+            else:
+                # Default: LABEL_0=positive, LABEL_1=neutral, LABEL_2=negative
+                label_map = {0: "positive", 1: "neutral", 2: "negative"}
+            
+            if label_num in label_map:
+                normalized_label = label_map[label_num]
+                normalized_scores[normalized_label] = score
+            continue
+        
+        # Map text labels to standard format
+        if any(kw in label_lower for kw in ["positive", "good", "great", "excellent", "pos"]):
+            normalized_scores["positive"] = normalized_scores.get("positive", 0) + score
+        elif any(kw in label_lower for kw in ["negative", "bad", "terrible", "neg"]):
+            normalized_scores["negative"] = normalized_scores.get("negative", 0) + score
+        elif any(kw in label_lower for kw in ["neutral", "neu", "mixed"]):
+            normalized_scores["neutral"] = normalized_scores.get("neutral", 0) + score
+        else:
+            # Unknown label - treat as neutral
+            normalized_scores["neutral"] = normalized_scores.get("neutral", 0) + score
+    
+    # If we don't have any normalized scores, default to neutral
+    if not normalized_scores:
+        logger.warning(f"Could not normalize any labels from {scores_dict} for model {model_name}")
+        return 1, "neutral"
+    
+    # For 2-class models (only positive and negative), exclude neutral
+    if "neutral" not in normalized_scores and len(normalized_scores) == 2:
+        logger.debug(f"2-class model detected for {model_name}")
+    
+    # Apply argmax - select class with highest score
+    max_sentiment = max(normalized_scores.items(), key=lambda x: x[1])
+    sentiment_name = max_sentiment[0]
+    
+    # Convert sentiment name to class number
+    sentiment_class_map = {
+        "positive": 0,
+        "neutral": 1,
+        "negative": 2
+    }
+    
+    sentiment_class = sentiment_class_map.get(sentiment_name, 1)
+    
+    return sentiment_class, sentiment_name
 
 
 def get_sentiment_name(sentiment_class: int) -> str:
@@ -97,61 +106,25 @@ def get_sentiment_name(sentiment_class: int) -> str:
 
 
 def normalize_batch_sentiments(
-    labels: list,
-    model_name: str,
-    confidences: list = None
+    scores_dicts: list,
+    model_name: str
 ) -> Tuple[list, list]:
     """
-    Normalize a batch of sentiment labels.
+    Normalize a batch of sentiment predictions using argmax.
     
     Args:
-        labels: List of sentiment labels
+        scores_dicts: List of score dictionaries from model outputs
         model_name: Name of the model
-        confidences: Optional list of confidence scores
         
     Returns:
         Tuple of (sentiment_classes, sentiment_names)
     """
-    if confidences is None:
-        confidences = [None] * len(labels)
-    
     classes = []
     names = []
     
-    for label, conf in zip(labels, confidences):
-        cls, name = normalize_sentiment(label, model_name, conf)
+    for scores_dict in scores_dicts:
+        cls, name = normalize_sentiment(scores_dict, model_name)
         classes.append(cls)
         names.append(name)
     
     return classes, names
-
-
-def map_2class_to_3class(
-    label: str,
-    confidence: float = None
-) -> Tuple[int, str]:
-    """
-    Map 2-class sentiment (positive/negative) to 3-class format.
-    For 2-class models without neutral, we assign neutral based on confidence.
-    
-    Args:
-        label: 'positive' or 'negative'
-        confidence: Confidence score for the prediction
-        
-    Returns:
-        Tuple of (sentiment_class, sentiment_name)
-    """
-    label = str(label).lower().strip()
-    
-    if "positive" in label:
-        # If confidence is low, might indicate uncertainty (neutral)
-        if confidence is not None and confidence < 0.6:
-            return 1, "neutral"
-        return 0, "positive"
-    elif "negative" in label:
-        # If confidence is low, might indicate uncertainty (neutral)
-        if confidence is not None and confidence < 0.6:
-            return 1, "neutral"
-        return 2, "negative"
-    
-    return 1, "neutral"

@@ -155,10 +155,9 @@ def run_sentiment_analysis(
         normalized_sentiments = {}
         for model_name in model_results.keys():
             inference_results = model_results[model_name]["inference_results"]
-            labels = inference_results["labels"]
-            scores = inference_results["scores"]
+            scores_dicts = inference_results["scores"]  # Now a list of dictionaries
             
-            classes, names = normalize_batch_sentiments(labels, model_name, scores)
+            classes, names = normalize_batch_sentiments(scores_dicts, model_name)
             normalized_sentiments[model_name] = {
                 "classes": classes,
                 "names": names
